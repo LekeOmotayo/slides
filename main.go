@@ -99,7 +99,7 @@ func runCliDemo(defaultPort int) {
 	fmt.Println("✅ All rate limiting algorithms passed with 0 external dependencies.")
 	fmt.Printf("👉 To run the interactive web dashboard:  go run . -serve -port %d\n", defaultPort)
 	fmt.Println("👉 To run high-concurrency benchmarks:    go run . -benchmark -concurrency 100")
-	fmt.Println("👉 To run automated test suite:           go test -v .\n")
+	fmt.Println("👉 To run automated test suite:           go test -v .")
 	os.Stdout.Sync()
 }
 
