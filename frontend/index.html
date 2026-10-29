@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rate Limit Telemetry Console — Leke Sliding Window Guard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+      </div>
+      <div>
+        <h1 class="brand-title">SLIDING WINDOW RATE GUARD</h1>
+        <p class="brand-subtitle">High-Precision In-Memory Concurrency & Burst Protection</p>
+      </div>
+    </div>
+    <div class="header-meta">
+      <div class="badge status-badge"><span class="pulse-dot"></span> GUARD ACTIVE</div>
+      <div class="meta-tag">PORT 8096</div>
+      <button id="reset-btn" class="btn btn-outline" title="Reset all internal window buffers">Reset Windows</button>
+    </div>
+  </header>
+
+  <main class="dashboard-grid">
+    <!-- Controls Column -->
+    <section class="panel control-panel">
+      <div class="panel-header">
+        <h2>Traffic Injector</h2>
+        <span class="panel-sub">Simulate incoming HTTP API bursts</span>
+      </div>
+
+      <div class="control-group">
+        <label for="algorithm-select">Algorithm Engine</label>
+        <select id="algorithm-select" class="form-select">
+          <option value="sliding_window">Sliding Window Log (Exact Sub-ms Precision)</option>
+          <option value="sliding_counter">Sliding Window Counter (O(1) Fixed Memory)</option>
+          <option value="token_bucket">Token Bucket (Sustained Rate + Bursts)</option>
+          <option value="multi_tier">Tiered Multi-Tenant Bucket</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="client-key">Client API Key / IP</label>
+        <input type="text" id="client-key" class="form-input" value="usr_live_prod_9941" spellcheck="false">
+      </div>
+
+      <div class="control-row">
+        <div class="control-group flex-1" id="tier-group" style="display: none;">
+          <label for="client-tier">Tier</label>
+          <select id="client-tier" class="form-select">
+            <option value="enterprise">Enterprise (50 req/s)</option>
+            <option value="pro">Pro (20 req/s)</option>
+            <option value="free" selected>Free (5 req/s)</option>
+          </select>
+        </div>
+
+        <div class="control-group flex-1">
+          <label for="request-cost">Cost (Units)</label>
+          <input type="number" id="request-cost" class="form-input" value="1" min="1" max="10">
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <label for="burst-slider">Burst Batch Size</label>
+          <span id="burst-val" class="slider-display">1 req</span>
+        </div>
+        <input type="range" id="burst-slider" min="1" max="15" value="1" class="form-range">
+      </div>
+
+      <div class="action-buttons">
+        <button id="send-btn" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+          Dispatch Request
+        </button>
+        <button id="burst-spam-btn" class="btn btn-danger">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+          Rapid Chaos Burst
+        </button>
+      </div>
+    </section>
+
+    <!-- Visualizer & Metrics -->
+    <section class="panel visualizer-panel">
+      <div class="panel-header">
+        <h2>Live Window Telemetry</h2>
+        <span class="panel-sub">Active 2,000ms sliding evaluation frame</span>
+      </div>
+
+      <div class="metrics-strip">
+        <div class="metric-card">
+          <span class="metric-label">STATUS</span>
+          <span id="status-display" class="metric-value status-200">200 OK</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">REMAINING QUOTA</span>
+          <span id="remaining-display" class="metric-value">5 / 5</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">RESET WINDOW</span>
+          <span id="reset-display" class="metric-value">0.00s</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">TOTAL REJECTED (429)</span>
+          <span id="rejected-display" class="metric-value text-danger">0</span>
+        </div>
+      </div>
+
+      <div class="window-visualizer">
+        <div class="visualizer-labels">
+          <span>-2000ms</span>
+          <span>Sliding Window Horizon</span>
+          <span>Now (0ms)</span>
+        </div>
+        <div class="window-track" id="window-track">
+          <!-- Real-time slots rendered here -->
+        </div>
+      </div>
+
+      <div class="header-preview-box">
+        <div class="box-header">
+          <span>IETF RFC RateLimit Headers</span>
+          <span class="mono-tag">HTTP Response</span>
+        </div>
+        <pre class="header-code" id="header-code">
+HTTP/1.1 200 OK
+X-RateLimit-Limit: 5
+X-RateLimit-Remaining: 5
+X-RateLimit-Reset: 0.00
+X-RateLimit-Algorithm: Sliding Window Log</pre>
+      </div>
+    </section>
+
+    <!-- Audit Log -->
+    <section class="panel log-panel">
+      <div class="panel-header">
+        <h2>Request Audit Stream</h2>
+        <span class="panel-sub">Sub-millisecond decision log</span>
+      </div>
+      <div class="audit-stream" id="audit-stream">
+        <div class="audit-row info-row">Ready. Dispatch a request to start evaluation stream.</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-package main
+package limiter
 
 import (
 	"fmt"
@@ -453,3 +453,4 @@ func (m *MultiTokenBucketLimiter) AllowN(key, tier string, cost float64) RateLim
 	res.Key = key
 	return res
 }
+

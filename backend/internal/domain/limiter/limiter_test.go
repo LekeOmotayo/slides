@@ -1,4 +1,4 @@
-package main
+package limiter
 
 import (
 	"sync"
@@ -163,3 +163,4 @@ func BenchmarkSlidingWindowCounter_Allow(b *testing.B) {
 		sc.AllowWithResult("bench_counter")
 	}
 }
+
